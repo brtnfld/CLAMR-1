@@ -157,11 +157,12 @@ int L7_Init (
     char* uuid;
     
     uuid = getenv ("pid");
+    /*printf("pid = %s\n", uuid);*/
     if (uuid!=NULL)
       if(uuid_parse( uuid, pool_uuid)<0)
 	printf("uuid_parse failed\n");
     
-    /* Initialize VOL */
+    /* Initialize VOL */ 
     if(H5VLdaosm_init(MPI_COMM_WORLD, pool_uuid, pool_grp) < 0)
       printf("Could not initialize VOL\n");
 #endif

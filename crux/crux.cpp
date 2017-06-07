@@ -57,6 +57,7 @@
 
 #ifdef HAVE_HDF5
 #include "hdf5.h"
+hsize_t *h5_chunk;
 #endif
 #ifdef HAVE_MPI
 #include "mpi.h"
@@ -97,7 +98,7 @@ void map_name_to_hdf5 (const char*, int, char*, char*);
 void access_named_hdf5_values (const char *name, int name_size,
                               hsize_t rank, hsize_t *cur_size, 
                               void *values, hid_t datatype,
-                              bool store);
+                              bool store, hsize_t *h5_chunk);
 #endif
 
 
@@ -208,7 +209,7 @@ void Crux::store_MallocPlus(MallocPlus memory){
                               mem_ptr, 
                               memory_item->mem_elsize == 4 ? 
                               H5T_NATIVE_INT : H5T_NATIVE_DOUBLE,
-                              true);
+				      true, h5_chunk);
         } else {
 #endif
             int num_elements = 1;
@@ -375,11 +376,12 @@ void map_name_to_hdf5 (const char *name, int name_size,
 void access_named_hdf5_values (const char *name, int name_size,
                               hsize_t rank, hsize_t *sizes, 
                               void *values, hid_t datatype,
-                              bool store)
+			       bool store, hsize_t *h5_chunk)
 {
     size_t length = 0, count = 1, offset = 0;
     char groupname[512], fieldname[512];
     hid_t hid_group, hid_space, hid_mem, hid_dataset, hid_plist = H5P_DEFAULT;
+    hid_t chunk_pid;
 
     map_name_to_hdf5(name, name_size, groupname, fieldname);
     for (hsize_t i=0; i<rank; i++)
@@ -443,8 +445,23 @@ void access_named_hdf5_values (const char *name, int name_size,
         exit(1);
     }
     if (store) {
-        hid_dataset = H5Dcreate (hid_group, fieldname, datatype, hid_space,
-                             H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+      chunk_pid = H5Pcreate(H5P_DATASET_CREATE);
+      if(h5_chunk) {
+	if( strcmp(fieldname,"V") == 0 || strcmp(fieldname,"U") == 0 || strcmp(fieldname,"H") == 0
+	    || strcmp(fieldname,"i") == 0 || strcmp(fieldname,"j") == 0 || strcmp(fieldname,"level") == 0 ) 
+	  {
+	    H5Pset_layout(chunk_pid, H5D_CHUNKED);
+	    if( H5Pset_fill_time(chunk_pid, H5D_FILL_TIME_NEVER) < 0 ) {
+	      fprintf(stderr, "writehdf5i error: Could not set fill time\n");
+	      exit(1);
+	    }
+	    hsize_t chunk = count/h5_chunk[0];
+	    H5Pset_chunk(chunk_pid, 1, &chunk);
+	  }
+      }
+      hid_dataset = H5Dcreate(hid_group, fieldname, datatype, hid_space,
+			      H5P_DEFAULT, chunk_pid, H5P_DEFAULT);
     } else
       hid_dataset = H5Dopen (hid_group, fieldname, H5P_DEFAULT);
 
@@ -471,6 +488,8 @@ void access_named_hdf5_values (const char *name, int name_size,
     else
       status = H5Dread (hid_dataset, datatype, hid_mem, hid_space, hid_plist, values);
 
+    if(h5_chunk)
+      H5Pclose(chunk_pid);
     H5Dclose (hid_dataset);
     H5Gclose (hid_group);
     H5Sclose (hid_space);
@@ -486,7 +505,7 @@ void Crux::store_named_ints(const char *name, int name_size, int *int_vals, size
 #ifdef HAVE_HDF5
     if (USE_HDF5) {
         access_named_hdf5_values (name, name_size, 1, (hsize_t *) &nelem, 
-                                 int_vals, H5T_NATIVE_INT, true);
+				  int_vals, H5T_NATIVE_INT, true, h5_chunk);
 
     } else {
 #endif
@@ -502,7 +521,7 @@ void Crux::restore_named_ints(const char *name, int name_size, int *int_vals, si
 #ifdef HAVE_HDF5
     if (USE_HDF5) {
         access_named_hdf5_values (name, name_size, 1, (hsize_t *) &nelem, 
-                                 int_vals, H5T_NATIVE_INT, false);
+				  int_vals, H5T_NATIVE_INT, false, h5_chunk);
 
     } else {
 #endif
@@ -724,7 +743,7 @@ void Crux::restore_MallocPlus(MallocPlus memory){
                     (hsize_t *) memory_item->mem_nelem, 
                     mem_ptr, 
                     memory_item->mem_elsize == 4 ? 
-                    H5T_NATIVE_INT : H5T_NATIVE_DOUBLE, false);
+				      H5T_NATIVE_INT : H5T_NATIVE_DOUBLE, false, h5_chunk);
         } else {
 #endif
             int num_elements = 1;

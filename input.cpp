@@ -85,6 +85,11 @@
 #define COARSE_GRID_RES 128
 #define MAX_TIME_STEP 3000
 
+#ifdef HAVE_HDF5
+#include "hdf5.h"
+extern hsize_t *h5_chunk;
+#endif
+
 using namespace std;
 
 //  Global variables.
@@ -186,7 +191,10 @@ void outputHelp()
          << "                    the default value for this parameter is 2.6e-13;" << endl
          << "  -V                use verbose output;" << endl
          << "  -v                display version information." << endl
-         << "  -z                force recalculation of neighbors." << endl; }
+#ifdef HAVE_HDF5
+         << "  -H <H>            HDF5 chunk size." << endl
+#endif
+         << "  -z                force recalculation of neighbors." << endl;}
 
 void outputVersion()
 {   cout << progName << " " << progVers << endl; }
@@ -490,7 +498,16 @@ void parseInput(const int argc, char** argv)
                 case 'z':  // Neighbor remap -- default is true, -z sets to false
                     neighbor_remap = false;
                     break;
-                    
+#ifdef HAVE_HDF5
+	        case 'H': // HDF5 chunk size
+		    val = strtok(argv[i++], " ,.-");
+		    h5_chunk = (hsize_t *)malloc(1 * sizeof(hsize_t));
+		    {
+		      int ks = std::atoi(val);
+		      h5_chunk[0] = (hsize_t)ks;
+		    }
+		    break;
+#endif
                 default:    //  Unknown parameter encountered.
                     cout << "⚠ Unknown input parameter " << val << endl;
                     outputHelp();

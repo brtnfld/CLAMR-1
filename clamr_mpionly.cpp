@@ -186,6 +186,11 @@ vector<spatial_t> y_global;
 vector<spatial_t> dy_global;
 vector<int> proc_global;
 
+#ifdef HAVE_HDF5
+#include "hdf5.h"
+extern hsize_t *h5_chunk;
+#endif
+
 int main(int argc, char **argv) {
 
    // Needed for code to compile correctly on the Mac
@@ -445,7 +450,11 @@ __itt_pause();
 __SSC_MARK(0x222);
 #endif
 #endif
-   
+#ifdef HAVE_HDF5
+ if(h5_chunk)
+   free(h5_chunk);
+#endif
+
    return 0;
 }
 

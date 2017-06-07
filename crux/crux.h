@@ -47,6 +47,10 @@
 
 #include <stdio.h>
 #include "MallocPlus/MallocPlus.h"
+/* #ifdef HAVE_HDF5 */
+/* #include "hdf5.h" */
+/* hsize_t *h5_chunk; */
+/* #endif */
 
 enum crux_types{
    CRUX_NONE,
